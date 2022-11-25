@@ -94,7 +94,11 @@ inputs:
   repo:
     description: "Optionally specify the repo where the release should be generated. Defaults to current repo"
     required: false
-    default: ''  
+    default: ''
+  skipIfReleaseExists:
+    description: "When skipIfReleaseExists is enabled the action will be skipped if a non-draft release already exists for the provided tag."
+    required: false
+    default: 'false'
   tag:
     description: 'An optional tag for the release. If this is omitted the git ref will be used (if it is a tag).'
     required: false
@@ -103,6 +107,10 @@ inputs:
     description: 'The Github token.'
     required: false
     default: ${{ github.token }}
+  updateOnlyUnreleased:
+    description: "When allowUpdates is enabled, this will fail the action if the release it is updating is not a draft or a prerelease."
+    required: false
+    default: 'false'
 outputs:
   id:
     description: 'The identifier of the created release.'
@@ -111,7 +119,7 @@ outputs:
   upload_url:
     description: 'The URL for uploading assets to the release.'
 runs:
-  using: 'node12'
+  using: 'node16'
   main: 'dist/index.js'
 branding:
   icon: 'tag'

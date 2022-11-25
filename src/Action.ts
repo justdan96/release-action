@@ -1,3 +1,4 @@
+import * as core from '@actions/core';
 import {Inputs} from "./Inputs";
 import {
     CreateOrUpdateReleaseResponse,
@@ -10,27 +11,40 @@ import {ArtifactUploader} from "./ArtifactUploader";
 import {GithubError} from "./GithubError";
 import {Outputs} from "./Outputs";
 import {ArtifactDestroyer} from "./ArtifactDestroyer";
+import {ReleaseValidator} from "./ReleaseValidator";
+import {ActionSkipper} from "./ActionSkipper";
 
 export class Action {
     private inputs: Inputs
     private outputs: Outputs
     private releases: Releases
-    private artifactDestroyer: ArtifactDestroyer
     private uploader: ArtifactUploader
+    private artifactDestroyer: ArtifactDestroyer
+    private skipper: ActionSkipper
+    
+    private releaseValidator: ReleaseValidator
 
     constructor(inputs: Inputs,
                 outputs: Outputs,
                 releases: Releases,
                 uploader: ArtifactUploader,
-                artifactDestroyer: ArtifactDestroyer) {
+                artifactDestroyer: ArtifactDestroyer,
+                skipper: ActionSkipper) {
         this.inputs = inputs
         this.outputs = outputs
         this.releases = releases
         this.uploader = uploader
         this.artifactDestroyer = artifactDestroyer
+        this.skipper = skipper
+        this.releaseValidator = new ReleaseValidator(inputs.updateOnlyUnreleased)
     }
 
     async perform() {
+        if (await this.skipper.shouldSkip()) {
+            core.notice("Skipping action, release already exists and skipIfReleaseExists is enabled.")
+            return
+        }
+        
         const releaseResponse = await this.createOrUpdateRelease();
         const releaseData = releaseResponse.data
         const releaseId = releaseData.id
@@ -56,6 +70,9 @@ export class Action {
             } catch (error: any) {
                 return await this.checkForMissingReleaseError(error)
             }
+            
+            // Fail if this isn't an unreleased release & updateOnlyUnreleased is enabled.
+            this.releaseValidator.validateReleaseUpdate(getResponse.data)
 
             return await this.updateRelease(getResponse.data.id)
         } else {
